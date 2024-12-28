@@ -6,7 +6,10 @@
 Covert Channel documentation
 ============================
 
-Please add your names, group ID, and your link to the forked public repository here by editing `index.rst` in the docs folder.
+- Mehmet Edebali Şener - 1503010
+- Berhem Şervan Gök - 2231959
+
+Group 48
 
 
 .. toctree::
