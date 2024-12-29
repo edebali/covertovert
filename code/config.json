@@ -12,6 +12,7 @@
     "parameters": {
       "timeout": 120,
       "log_file_name": "ntp_precision_receiver.log",
+      "source_ip": "172.18.0.2",
       "ntp_port": 123
     }
   }
