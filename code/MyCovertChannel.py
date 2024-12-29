@@ -8,7 +8,6 @@ import json
 class MyCovertChannel(CovertChannelBase):
     def __init__(self):
         super().__init__()
-        self.ntp_port = 123
         with open('config.json', 'r') as f:
             self.debug = json.load(f).get('debug', False)
 
@@ -32,11 +31,11 @@ class MyCovertChannel(CovertChannelBase):
         
         return total, avg
 
-    def create_ntp_packet(self, precision_value, payload):
+    def create_ntp_packet(self, precision_value, payload, destination_ip, ntp_port):
         """
-        Create NTP packet with specified precision value and payload.
+        Create NTP packet with specified precision value, payload, and network parameters.
         """
-        return IP(dst="172.18.0.3")/UDP(sport=RandShort(), dport=self.ntp_port)/NTP(precision=precision_value)/Raw(load=payload)
+        return IP(dst=destination_ip)/UDP(sport=RandShort(), dport=ntp_port)/NTP(precision=precision_value)/Raw(load=payload)
 
     def encode_bit(self, bits, payload):
         """
@@ -77,7 +76,7 @@ class MyCovertChannel(CovertChannelBase):
             result = value ^ (avg % 2)
             return str(result), 1
 
-    def send(self, log_file_name):
+    def send(self, log_file_name, destination_ip, ntp_port):
         """
         Send covert message using NTP precision field
         """
@@ -89,7 +88,7 @@ class MyCovertChannel(CovertChannelBase):
             try:
                 payload = self.generate_random_message()
                 precision, bits_used = self.encode_bit(remaining_bits, payload)
-                packet = self.create_ntp_packet(precision, payload)
+                packet = self.create_ntp_packet(precision, payload, destination_ip, ntp_port)
                 CovertChannelBase.send(self, packet)
                 
                 total, avg = self.calculate_payload_info(payload)
@@ -102,7 +101,7 @@ class MyCovertChannel(CovertChannelBase):
             except Exception as e:
                 self.debug_print(f"Error sending: {e}")
 
-    def receive(self, timeout, log_file_name):
+    def receive(self, timeout, log_file_name, ntp_port):
         """
         Receive and decode covert message
         """
@@ -142,7 +141,7 @@ class MyCovertChannel(CovertChannelBase):
 
         try:
             self.debug_print("Starting packet capture...")
-            sniff(filter=f"udp and port {self.ntp_port}", 
+            sniff(filter=f"udp and port {ntp_port}", 
                 prn=process_packet,
                 stop_filter=lambda _: stop_sniffing,
                 timeout=timeout)

@@ -1,15 +1,18 @@
 {
   "covert_channel_code": "CSC-PSV-NTP-PRC",
-  "debug": true,
+  "debug": false,
   "send": {
     "parameters": {
-      "log_file_name": "ntp_precision_sender.log"
+      "log_file_name": "ntp_precision_sender.log",
+      "destination_ip": "172.18.0.3",
+      "ntp_port": 123
     }
   },
   "receive": {
     "parameters": {
       "timeout": 120,
-      "log_file_name": "ntp_precision_receiver.log"
+      "log_file_name": "ntp_precision_receiver.log",
+      "ntp_port": 123
     }
   }
 }
