@@ -19,21 +19,18 @@ class MyCovertChannel(CovertChannelBase):
         if self.debug:
             print(message)
 
-    def calculate_payload_factor(self, payload):
+    def calculate_payload_info(self, payload):
         """
-        Calculate a binary factor based on payload characteristics.
-        Returns 0 or 1 to adjust the precision value.
+        Calculate total and avg values from payload
+        Returns (total, avg) where:
+        - total is binary (0 or 1)
+        - avg is between 0-3 or 0-1 depending on total
         """
-        payload_bytes = payload.encode('utf-8')
-
-        factors = [
-            len(payload) % 2,
-            sum(1 for c in payload if c.isupper()) % 2,
-            sum(1 for c in payload if c.isdigit()) % 2,
-            (sum(b for b in payload_bytes) % 2)
-        ]
+        total = sum(ord(c) for c in payload)
+        avg = (int(total / len(payload)) % (4 if total % 2 == 0 else 2)) if len(payload) > 0 else 0
+        total = total % 2
         
-        return sum(factors) % 2
+        return total, avg
 
     def create_ntp_packet(self, precision_value, payload):
         """
@@ -41,49 +38,73 @@ class MyCovertChannel(CovertChannelBase):
         """
         return IP(dst="172.18.0.3")/UDP(sport=RandShort(), dport=self.ntp_port)/NTP(precision=precision_value)/Raw(load=payload)
 
-    def encode_bit(self, bit, payload):
+    def encode_bit(self, bits, payload):
         """
-        Encode a single bit using precision value and payload factor.
-        Uses standard NTP precision values -6 and -7.
+        Encode bits using precision value based on payload characteristics
+        Uses range [-6, -11] corresponding to [0, 5]
         """
-        payload_factor = self.calculate_payload_factor(payload)
-        should_use_higher = int(bit) ^ payload_factor
-
-        return -6 if should_use_higher else -7
+        total, avg = self.calculate_payload_info(payload)
+        
+        if total == 0:
+            if len(bits) >= 2:
+                bits_value = int(bits[:2], 2)
+                result = bits_value ^ avg
+                return -(result + 6), 2
+            else:
+                bit_value = int(bits[0])
+                result = 4 if bit_value == 0 else 5
+                return -(result + 6), 1 
+        else: 
+            bit_value = int(bits[0])
+            result = bit_value ^ (avg % 2)
+            return -(result + 6), 1 
 
     def decode_bit(self, precision_value, payload):
         """
-        Decode precision value back to bit using payload factor.
+        Decode precision value back to bits using payload characteristics
         """
-        payload_factor = self.calculate_payload_factor(payload)
+        total, avg = self.calculate_payload_info(payload)
+        
+        value = abs(precision_value) - 6
+        
+        if total == 0:
+            if value in [4, 5]:
+                return str(value - 4), 1
+            else:
+                result = value ^ avg
+                return format(result, '02b'), 2
+        else:
+            result = value ^ (avg % 2)
+            return str(result), 1
 
-        received_higher = 1 if precision_value == -6 else 0
-        return str(received_higher ^ payload_factor)
-
-    def send(self, log_file_name, delay_ms):
+    def send(self, log_file_name):
         """
-        Send covert message using NTP precision field.
+        Send covert message using NTP precision field
         """
         binary_message = self.generate_random_binary_message_with_logging(log_file_name)
         self.debug_print(f"Starting to send message of length: {len(binary_message)} bits")
-
-        for i, bit in enumerate(binary_message):
+        
+        remaining_bits = binary_message
+        while remaining_bits:
             try:
                 payload = self.generate_random_message()
-                precision = self.encode_bit(bit, payload)
+                precision, bits_used = self.encode_bit(remaining_bits, payload)
                 packet = self.create_ntp_packet(precision, payload)
                 CovertChannelBase.send(self, packet)
                 
-                self.debug_print(f"Sent bit {bit} with precision {precision}, payload factor {self.calculate_payload_factor(payload)}")
-
-                self.sleep_random_time_ms(1, 2)
+                total, avg = self.calculate_payload_info(payload)
+                self.debug_print(f"Sent {bits_used} bits ({remaining_bits[:bits_used]}) "
+                            f"with precision {precision}, total={total}, avg={avg}")
+                
+                remaining_bits = remaining_bits[bits_used:]
+                self.sleep_random_time_ms()
                 
             except Exception as e:
-                self.debug_print(f"Error sending bit {i}: {e}")
+                self.debug_print(f"Error sending: {e}")
 
     def receive(self, timeout, log_file_name):
         """
-        Receive and decode covert message.
+        Receive and decode covert message
         """
         received_bits = ""
         received_message = ""
@@ -97,10 +118,12 @@ class MyCovertChannel(CovertChannelBase):
                     precision = packet[NTP].precision
                     payload = packet[Raw].load.decode('utf-8', errors='ignore')
                     
-                    bit = self.decode_bit(precision, payload)
-                    received_bits += bit
+                    bits, bits_decoded = self.decode_bit(precision, payload)
+                    received_bits += bits
                     
-                    self.debug_print(f"Received precision {precision}, decoded bit {bit}, payload factor {self.calculate_payload_factor(payload)}")
+                    total, avg = self.calculate_payload_info(payload)
+                    self.debug_print(f"Received precision {precision}, decoded {bits_decoded} bits: {bits}, "
+                                f"total={total}, avg={avg}")
                     
                     while len(received_bits) >= 8:
                         char = self.convert_eight_bits_to_character(received_bits[:8])
@@ -112,7 +135,7 @@ class MyCovertChannel(CovertChannelBase):
                         if char == '.':
                             stop_sniffing = True
                             return True
-                            
+                                
             except Exception as e:
                 self.debug_print(f"Error processing packet: {e}")
                 return False
@@ -120,9 +143,9 @@ class MyCovertChannel(CovertChannelBase):
         try:
             self.debug_print("Starting packet capture...")
             sniff(filter=f"udp and port {self.ntp_port}", 
-                  prn=process_packet,
-                  stop_filter=lambda _: stop_sniffing,
-                  timeout=timeout)
+                prn=process_packet,
+                stop_filter=lambda _: stop_sniffing,
+                timeout=timeout)
             
             self.debug_print(f"Final received message: {received_message}")
             self.log_message(received_message, log_file_name)

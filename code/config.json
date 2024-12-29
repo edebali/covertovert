@@ -3,7 +3,6 @@
   "debug": true,
   "send": {
     "parameters": {
-      "delay_ms": 2,
       "log_file_name": "ntp_precision_sender.log"
     }
   },
