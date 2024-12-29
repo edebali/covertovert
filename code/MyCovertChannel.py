@@ -76,11 +76,13 @@ class MyCovertChannel(CovertChannelBase):
             result = value ^ (avg % 2)
             return str(result), 1
 
-    def send(self, log_file_name, destination_ip, ntp_port):
+    def send(self, log_file_name, destination_ip, ntp_port, min_length_bytes, max_length_bytes):
         """
         Send covert message using NTP precision field
         """
-        binary_message = self.generate_random_binary_message_with_logging(log_file_name)
+        binary_message = self.generate_random_binary_message_with_logging(log_file_name,
+                                                                          min_length_bytes,
+                                                                          max_length_bytes)
         self.debug_print(f"Starting to send message of length: {len(binary_message)} bits")
         
         remaining_bits = binary_message
