@@ -24,3 +24,5 @@ go.work.sum
 .DS_Store
 .*
 _*
+code/ntp_precision_receiver.log
+code/ntp_precision_sender.log
