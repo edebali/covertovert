@@ -5,7 +5,9 @@
     "parameters": {
       "log_file_name": "ntp_precision_sender.log",
       "destination_ip": "172.18.0.3",
-      "ntp_port": 123
+      "ntp_port": 123,
+      "min_length_bytes": 16,
+      "max_length_bytes": 16
     }
   },
   "receive": {
