@@ -101,7 +101,7 @@ class MyCovertChannel(CovertChannelBase):
             except Exception as e:
                 self.debug_print(f"Error sending: {e}")
 
-    def receive(self, timeout, log_file_name, ntp_port):
+    def receive(self, timeout, log_file_name, source_ip, ntp_port):
         """
         Receive and decode covert message
         """
@@ -141,7 +141,7 @@ class MyCovertChannel(CovertChannelBase):
 
         try:
             self.debug_print("Starting packet capture...")
-            sniff(filter=f"udp and port {ntp_port}", 
+            sniff(filter=f"udp and port {ntp_port} and ip src {source_ip}",
                 prn=process_packet,
                 stop_filter=lambda _: stop_sniffing,
                 timeout=timeout)
